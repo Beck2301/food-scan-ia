@@ -1,112 +1,225 @@
+import { useState, useCallback } from 'react';
+import { StyleSheet, View, Text, FlatList, TouchableOpacity, RefreshControl, Platform, Modal, ScrollView } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
+import { router, useFocusEffect } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
 
-import { Collapsible } from '@/components/ui/collapsible';
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+export default function HistoryScreen() {
+  const [history, setHistory] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const insets = useSafeAreaInsets();
 
-export default function TabTwoScreen() {
+  useFocusEffect(
+    useCallback(() => {
+      loadHistory();
+    }, [])
+  );
+
+  const loadHistory = async () => {
+    setLoading(true);
+    try {
+      const data = await AsyncStorage.getItem('scanHistory');
+      if (data) {
+        // Reverse so newest are at the top
+        setHistory(JSON.parse(data).reverse());
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clearHistory = async () => {
+    try {
+      await AsyncStorage.removeItem('scanHistory');
+      setHistory([]);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const renderItem = ({ item }: { item: any }) => (
+    <TouchableOpacity style={styles.card} onPress={() => setSelectedItem(item)} activeOpacity={0.8}>
+      {item.uri ? (
+        <Image source={item.uri} style={styles.cardImage} contentFit="cover" />
+      ) : (
+        <View style={[styles.cardImage, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems:'center' }]}>
+          <Ionicons name="fast-food-outline" size={30} color="#999" />
+        </View>
+      )}
+      <View style={styles.cardContent}>
+        <Text style={styles.dateText}>{item.date}</Text>
+        <Text style={styles.resultText} numberOfLines={4}>{item.text}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
-        </ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+    <LinearGradient colors={['#ffffff', '#fdfbfb']} style={styles.container}>
+      <SafeAreaView style={{ flex: 1, paddingHorizontal: 25, paddingTop: 20 }}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={24} color="#1c1c1e" />
+          </TouchableOpacity>
+          <Text style={styles.title}>Historial</Text>
+          <TouchableOpacity onPress={clearHistory} style={styles.clearBtn}>
+            <Ionicons name="trash-outline" size={20} color="#ff3b30" />
+          </TouchableOpacity>
+        </View>
+
+        {history.length === 0 && !loading ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="receipt-outline" size={80} color="#dfdfdf" />
+            <Text style={styles.emptyText}>No has escaneado platillos aún.</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={history}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            contentContainerStyle={styles.listContainer}
+            showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={loading} onRefresh={loadHistory} />}
+          />
+        )}
+      </SafeAreaView>
+
+      {/* Modal para ver detalles completos */}
+      <Modal visible={!!selectedItem} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { marginTop: insets.top + 20, marginBottom: insets.bottom + 20 }]}>
+            <TouchableOpacity style={styles.closeBtn} onPress={() => setSelectedItem(null)}>
+              <Ionicons name="close-circle" size={32} color="#1c1c1e" />
+            </TouchableOpacity>
+            
+            {selectedItem?.uri && (
+              <Image source={selectedItem.uri} style={styles.fullImageModal} contentFit="cover" />
+            )}
+            
+            <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalDate}>{selectedItem?.date}</Text>
+              <Text style={styles.modalText}>{selectedItem?.text}</Text>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
-  },
-  titleContainer: {
+  container: { flex: 1 },
+  header: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 30,
   },
+  backBtn: {
+    padding: 10,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 20,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1c1c1e',
+  },
+  clearBtn: {
+    padding: 10,
+    backgroundColor: '#ffeeec',
+    borderRadius: 20,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyText: {
+    marginTop: 20,
+    fontSize: 16,
+    color: '#999',
+    textAlign: 'center',
+  },
+  listContainer: {
+    paddingBottom: 40,
+  },
+  card: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    marginBottom: 15,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+    overflow: 'hidden',
+  },
+  cardImage: {
+    width: 100,
+    height: 120,
+  },
+  cardContent: {
+    flex: 1,
+    padding: 15,
+    justifyContent: 'center',
+  },
+  dateText: {
+    fontSize: 12,
+    color: '#999',
+    fontWeight: '600',
+    marginBottom: 5,
+  },
+  resultText: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 20,
+  },
+  modalContent: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 30,
+    overflow: 'hidden',
+    paddingTop: 50,
+  },
+  closeBtn: {
+    position: 'absolute',
+    top: 15,
+    right: 15,
+    zIndex: 10,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    borderRadius: 20,
+  },
+  fullImageModal: {
+    width: '100%',
+    height: 300,
+  },
+  modalScroll: {
+    flex: 1,
+    padding: 25,
+  },
+  modalDate: {
+    fontSize: 14,
+    color: '#999',
+    fontWeight: 'bold',
+    marginBottom: 15,
+  },
+  modalText: {
+    fontSize: 18,
+    color: '#1c1c1e',
+    lineHeight: 28,
+    paddingBottom: 40,
+  }
 });

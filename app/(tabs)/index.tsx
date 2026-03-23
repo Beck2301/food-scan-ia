@@ -6,6 +6,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
@@ -30,13 +32,25 @@ export default function HomeScreen() {
     setIsCameraActive(true);
   };
 
-  const analyzeFood = async (base64Data: string) => {
+  const analyzeFood = async (base64Data: string, imageUri: string = "") => {
     setAnalyzing(true);
     setAiAnalysis("Analizando platillo...");
     
     try {
       if (!GEMINI_API_KEY) {
         throw new Error("no .env detectado");
+      }
+
+      let extraPrompt = "";
+      try {
+        const dieta = await AsyncStorage.getItem('dieta');
+        const alergias = await AsyncStorage.getItem('alergias');
+        const sintomas = await AsyncStorage.getItem('sintomas');
+        if (dieta || alergias || sintomas) {
+          extraPrompt = `\n\nADVERTENCIA MÉDICA/DIETA: El usuario sigue esta dieta: "${dieta || 'Ninguna'}". Y tiene estas alergias: "${alergias || 'Ninguna'}". Además reporta tener estos síntomas actuales: "${sintomas || 'Ningún síntoma'}". Si el platillo de la imagen típicamente contiene esos alérgenos, rompe su dieta, o contiene ingredientes que pueden empeorar severamente sus síntomas, DEBES advertirle CLARAMENTE (en mayúsculas) al inicio de tu respuesta.`;
+        }
+      } catch (e) {
+        console.warn("No se pudo cargar el perfil", e);
       }
 
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
@@ -47,7 +61,7 @@ export default function HomeScreen() {
         body: JSON.stringify({
           contents: [{
             parts: [
-              { text: "Eres el mejor chef del mundo. Dime qué platillo es este y sus posibles ingredientes iniciales en viñetas cortas. Sé directo, amigable y breve (máximo 5 renglones)." },
+              { text: `Eres el mejor chef del mundo. Dime qué platillo es este y sus posibles ingredientes iniciales en viñetas cortas. Sé directo, amigable y breve (máximo 5 renglones). ${extraPrompt}` },
               { inline_data: { mime_type: "image/jpeg", data: base64Data } }
             ]
           }]
@@ -60,6 +74,20 @@ export default function HomeScreen() {
       
       const textoGenerado = data.candidates[0].content.parts[0].text;
       setAiAnalysis(textoGenerado);
+      
+      if (imageUri) {
+        try {
+          const historyString = await AsyncStorage.getItem('scanHistory');
+          const history = historyString ? JSON.parse(historyString) : [];
+          history.push({
+            id: Date.now().toString(),
+            date: new Date().toLocaleDateString() + " " + new Date().toLocaleTimeString().slice(0, 5),
+            text: textoGenerado,
+            uri: imageUri
+          });
+          await AsyncStorage.setItem('scanHistory', JSON.stringify(history));
+        } catch(e) { console.log("Error guardando historial", e); }
+      }
       
     } catch (e: any) {
       console.error(e);
@@ -78,7 +106,7 @@ export default function HomeScreen() {
       setFoodImage(photo.uri);
       
       if (photo.base64) {
-        analyzeFood(photo.base64);
+        analyzeFood(photo.base64, photo.uri);
       }
     } 
     // Si ya hay foto, limpiar y volver a la cámara
@@ -104,12 +132,12 @@ export default function HomeScreen() {
         
       
         <View style={styles.headerRow}>
-           <View style={styles.iconBubble}>
+           <TouchableOpacity style={styles.iconBubble} onPress={() => router.push('/explore')}>
              <Ionicons name="apps-outline" size={24} color="#333" />
-           </View>
-           <View style={styles.iconBubble}>
+           </TouchableOpacity>
+           <TouchableOpacity style={styles.iconBubble} onPress={() => router.push('/modal')}>
              <Ionicons name="person-outline" size={24} color="#333" />
-           </View>
+           </TouchableOpacity>
         </View>
 
        
